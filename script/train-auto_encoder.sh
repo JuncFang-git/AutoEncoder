@@ -2,7 +2,7 @@ cd .. &&
 ###
  # @Author: Juncfang
  # @Date: 2022-06-16 15:51:32
- # @LastEditTime: 2022-06-16 15:58:29
+ # @LastEditTime: 2022-06-28 15:14:05
  # @LastEditors: Juncfang
  # @Description: 
  # @FilePath: /AutoEncoder/script/train-auto_encoder.sh
@@ -10,8 +10,8 @@ cd .. &&
 ### 
 CUDA_VISIBLE_DEVICES=0 \
 python train.py \
---name auto_encoder-test \
---dataroot /home/junkai/dataset/ddy2/style1/combine/half \
+--name auto_encoder-3945 \
+--dataroot /home/junkai/dataset/align-half-6-28 \
 --checkpoints_dir ./checkpoints/ \
 --resize_or_crop none \
 --ngf 16 \
@@ -20,7 +20,7 @@ python train.py \
 --niter_decay 300 \
 --save_latest_freq 20000 \
 --save_epoch_freq 10 \
---lambda_feat 0.01 \
+--lambda_feat 1 \
 --use_l1_loss \
 # --no_vgg_loss \ 
 # --resize_or_crop scale_width_and_crop --loadSize 512 --fineSize 512 \

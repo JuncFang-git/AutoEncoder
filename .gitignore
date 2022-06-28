@@ -1,2 +1,4 @@
 *.pyc
 checkpoints
+test_result
+nohup.out

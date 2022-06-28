@@ -1,7 +1,7 @@
 '''
 Author: Juncfang
 Date: 2022-05-30 15:59:55
-LastEditTime: 2022-06-16 15:39:50
+LastEditTime: 2022-06-17 14:35:39
 LastEditors: Juncfang
 Description: 
 FilePath: /AutoEncoder/option/options.py
@@ -22,10 +22,13 @@ class Options():
             self._add_train_args()
             args = self.parser.parse_args()
             args.isTrain = True
+            args.phase = "train"
         elif self.phase == "test":
             self._add_test_args()
             args = self.parser.parse_args()
             args.isTrain = False
+            args.continue_train = False
+            args.phase = "test"
         else:
             raise KeyError("Error phase at get_args!")
         # print args
@@ -48,6 +51,8 @@ class Options():
     def _add_base_args(self):
         self.parser.add_argument('--name', type=str, default='label2city', help='name of the experiment. It decides where to store samples and models')
         self.parser.add_argument('--checkpoints_dir', type=str, default='./checkpoints', help='models are saved here')
+        self.parser.add_argument('--which_epoch', type=str, default='latest', help='which epoch to load? set to latest to use latest cached model')
+        self.parser.add_argument('--phase', type=str, default='train', help='train, val, test, etc')
         self.parser.add_argument('--norm', type=str, default='instance', help='instance normalization or batch normalization')
 
         # input/output sizes       
@@ -88,8 +93,6 @@ class Options():
         # for training
         self.parser.add_argument('--continue_train', action='store_true', help='continue training: load the latest model')
         self.parser.add_argument('--load_pretrain', type=str, default='', help='load the pretrained model from the specified location')
-        self.parser.add_argument('--which_epoch', type=str, default='latest', help='which epoch to load? set to latest to use latest cached model')
-        self.parser.add_argument('--phase', type=str, default='train', help='train, val, test, etc')
         self.parser.add_argument('--niter', type=int, default=100, help='# of iter at starting learning rate')
         self.parser.add_argument('--niter_decay', type=int, default=100, help='# of iter to linearly decay learning rate to zero')
         self.parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
@@ -111,4 +114,6 @@ class Options():
         self.parser.add_argument('--use_l1_loss', action='store_true', help='if specified, use l1 feature matching loss')
 
     def _add_test_args(self):
-        pass
+        self.parser.add_argument('--results_dir', type=str, default='./test_result', help='test result will save here')
+        self.parser.add_argument('--how_many', type=int, default=float('inf'), help='how many image will be test')
+        
