@@ -1,10 +1,10 @@
 '''
 Author: Juncfang
 Date: 2022-05-30 15:59:55
-LastEditTime: 2022-06-17 14:35:39
+LastEditTime: 2022-06-28 23:52:23
 LastEditors: Juncfang
 Description: 
-FilePath: /AutoEncoder/option/options.py
+FilePath: /AutoEncoder/data5/junc/code/AutoEncoder/option/options.py
  
 '''
 import os
@@ -67,7 +67,7 @@ class Options():
         self.parser.add_argument('--resize_or_crop', type=str, default='scale_width', help='scaling and cropping of images at load time [resize_and_crop|crop|scale_width|scale_width_and_crop]')
         self.parser.add_argument('--shuffle_data', action='store_true', help='if true, takes images in order to make batches, otherwise takes them randomly')        
         self.parser.add_argument('--no_flip', action='store_true', help='if specified, do not flip the images for data argumentation') 
-        self.parser.add_argument('--num_worker', default=2, type=int, help='# threads for loading data')                
+        self.parser.add_argument('--num_worker', default=0, type=int, help='# threads for loading data')                
         self.parser.add_argument('--max_dataset_size', type=int, default=float("inf"), help='Maximum number of samples allowed per dataset. If the dataset directory contains more than max_dataset_size, only a subset is loaded.')
 
         # for displays

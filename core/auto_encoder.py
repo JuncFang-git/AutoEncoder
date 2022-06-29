@@ -85,7 +85,7 @@ class AutoEncoder(nn.Module):
 
     def forward(self, image, infer=False):
         # Inputs to cuda
-        real_image = image.cuda()
+        real_image = image.to(self.opt.rank)
         # Get feature
         feature = self.netEn.forward(real_image)
         # Get reconstruction image
@@ -102,7 +102,7 @@ class AutoEncoder(nn.Module):
         return [ self.loss_filter(loss_G_VGG,loss_G_l1), None if not infer else gen_image ]
         
     def inference(self, image):
-        real_image =  image.cuda()
+        real_image =  image.to(self.opt.rank)
         with torch.no_grad():
             gen_image = self.netDe.forward(self.netEn.forward(real_image))
         return gen_image
@@ -129,11 +129,9 @@ class AutoEncoder(nn.Module):
     def save_network(self, network, network_label, epoch_label):
         save_filename = '%s_net_%s.pth' % (epoch_label, network_label)
         save_path = os.path.join(self.save_dir, save_filename)
-        torch.save(network.cpu().state_dict(), save_path)
+        torch.save(network.state_dict(), save_path)
         network.cuda()
 
 class InferenceAutoEncoder(AutoEncoder):
     def forward(self, inp):
         return self.inference(inp)
-
-        

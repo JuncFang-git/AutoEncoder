@@ -17,14 +17,14 @@ def weights_init(m):
 
 def define_Encoder(input_nc, ngf, norm="none"):
     netEn = Encoder(input_nc, ngf, repeat_num=4, norm_type=norm)
-    netEn.cuda()
     netEn.apply(weights_init)
+    netEn.cuda()
     return netEn
     
 def define_Decoder(input_nc, output_nc, norm="none"):
     netDe = Decoder(input_nc, output_nc, up_type="deconv", norm_type=norm)
-    netDe.cuda()
     netDe.apply(weights_init)
+    netDe.cuda()
     return netDe
 
 def print_network(net):
