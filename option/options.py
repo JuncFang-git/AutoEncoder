@@ -1,10 +1,10 @@
 '''
 Author: Juncfang
 Date: 2022-05-30 15:59:55
-LastEditTime: 2022-06-28 23:52:23
+LastEditTime: 2022-07-04 10:22:43
 LastEditors: Juncfang
 Description: 
-FilePath: /AutoEncoder/data5/junc/code/AutoEncoder/option/options.py
+FilePath: /AutoEncoder/option/options.py
  
 '''
 import os
@@ -82,6 +82,8 @@ class Options():
         # self.parser.add_argument('--n_local_enhancers', type=int, default=1, help='number of local enhancers to use')   
     
     def _add_train_args(self):
+        # for ddp
+        self.parser.add_argument('--ddp_mode', action='store_true', help='if use ddp technology to use multi gpu. ddp need at least 2 gpu')
         # for displays
         self.parser.add_argument('--display_freq', type=int, default=100, help='frequency of showing training results on screen')
         self.parser.add_argument('--print_freq', type=int, default=100, help='frequency of showing training results on console')

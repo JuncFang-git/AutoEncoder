@@ -16,7 +16,7 @@ import torch.multiprocessing as mp
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-def main(opt):
+def train(opt):
     ## setup 
     iter_path = os.path.join(opt.checkpoints_dir, opt.name, 'iter.txt')
     if opt.continue_train:
@@ -38,16 +38,22 @@ def main(opt):
         opt.max_dataset_size = 20
     ## get data
     dataset = SingleDataset(opt)
-    train_sampler = torch.utils.data.distributed.DistributedSampler(dataset, rank=opt.rank, num_replicas=opt.world_size)
-    data_loader =  torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize, 
-                                               shuffle=False, num_workers=int(opt.num_worker), pin_memory=True, sampler=train_sampler)
     dataset_size = min(len(dataset), opt.max_dataset_size)
     print('#training images = %d' % dataset_size)
+    if opt.ddp_mode:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(dataset, rank=opt.rank, num_replicas=opt.world_size)
+        data_loader =  torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize, 
+                                                shuffle=False, num_workers=int(opt.num_worker), pin_memory=True, sampler=train_sampler)
+    else:
+         data_loader =  torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize, 
+                                                shuffle=True, num_workers=int(opt.num_worker), pin_memory=True)                                               
     ## get model and optimizer
-    model = AutoEncoder(opt)
-    model.cuda()
-    model = DDP(model, device_ids=[opt.rank],output_device=opt.rank)
-    optimizer_En, optimizer_De = model.module.optimizer_En, model.module.optimizer_De
+    model = AutoEncoder(opt).cuda()
+    if opt.ddp_mode:
+        model = DDP(model, device_ids=[opt.rank],output_device=opt.rank)
+        optimizer_En, optimizer_De = model.module.optimizer_En, model.module.optimizer_De
+    else:
+        optimizer_En, optimizer_De = model.optimizer_En, model.optimizer_De
     ## get visualizer
     visualizer = Visualizer(opt)
     total_steps = (start_epoch-1) * dataset_size + epoch_iter
@@ -62,13 +68,13 @@ def main(opt):
         for i, data in enumerate(data_loader, start=epoch_iter):
             if total_steps % opt.print_freq == print_delta:
                 iter_start_time = time.time()
-            total_steps += opt.batchSize * opt.world_size
-            epoch_iter += opt.batchSize * opt.world_size
+            total_steps += opt.batchSize * opt.world_size if opt.ddp_mode else opt.batchSize
+            epoch_iter += opt.batchSize * opt.world_size if opt.ddp_mode else opt.batchSize
             ############## Forward Pass ######################
             save_fake = total_steps % opt.display_freq == display_delta # whether to collect output images
             losses, generated = model(data['input'], infer=save_fake)
             losses = [ torch.mean(x) if not isinstance(x, int) else x for x in losses ] # sum each losses
-            loss_dict = dict(zip(model.module.loss_names, losses))
+            loss_dict = dict(zip(model.module.loss_names, losses)) if opt.ddp_mode else dict(zip(model.loss_names, losses))
             # calculate final loss scalar
             loss_all = loss_dict.get('G_l1', 0) + loss_dict.get('G_VGG',0)
             ############### Backward Pass ####################
@@ -79,7 +85,7 @@ def main(opt):
             optimizer_En.step()
             optimizer_De.step()
             ############## Display results and errors ##########
-            if opt.rank == 0:
+            if not opt.ddp_mode or opt.rank == 0:
                 ### print out errors
                 if total_steps % opt.print_freq == print_delta:
                     errors = {k: v.data.item() if not isinstance(v, int) else v for k, v in loss_dict.items()}            
@@ -94,25 +100,34 @@ def main(opt):
                 ### save latest model
                 if total_steps % opt.save_latest_freq == save_delta:
                     print('saving the latest model (epoch %d, total_steps %d)' % (epoch, total_steps))
-                    model.module.save('latest')            
+                    if opt.ddp_mode:
+                        model.module.save('latest')
+                    else:
+                        model.save('latest')
                     np.savetxt(iter_path, (epoch, epoch_iter), delimiter=',', fmt='%d')
             if epoch_iter >= dataset_size:
                 print("break")
                 break
-        if opt.rank == 0:
+        if not opt.ddp_mode or opt.rank == 0:
             # end of epoch
             print('End of epoch %d / %d \t Time Taken: %d sec' %
                 (epoch, opt.niter + opt.niter_decay, time.time() - epoch_start_time))
             ### save model for this epoch
-            if epoch % opt.save_epoch_freq == 0 and opt.rank == 0:
+            if epoch % opt.save_epoch_freq == 0:
                 print('saving the model at the end of epoch %d, iters %d' % (epoch, total_steps))        
-                model.module.save('latest')
-                model.module.save(epoch)
+                if opt.ddp_mode:
+                    model.module.save('latest')
+                    model.module.save(epoch)
+                else:
+                    model.save('latest')
+                    model.save(epoch)
                 np.savetxt(iter_path, (epoch+1, 0), delimiter=',', fmt='%d')
         ### linearly decay learning rate after certain iterations
         if epoch > opt.niter:
-            model.module.update_learning_rate()
-
+            if opt.ddp_mode:
+                model.module.update_learning_rate()
+            else:
+                model.update_learning_rate()
 
 def setup(rank, world_size):
     torch.cuda.set_device(rank)
@@ -131,25 +146,22 @@ def setup(rank, world_size):
 def cleanup():
     dist.destroy_process_group()
 
-def basic(rank, world_size):
+def ddp_function(rank, world_size, opt):
     print(f"Running basic DDP example on rank {rank}.")
     setup(rank, world_size)
-    opt = Options("train").get_args()
     opt.rank = rank
     opt.world_size = world_size
-    main(opt)
-    # cleanup()
+    train(opt)
+    cleanup()
     
-def run(fn, world_size):
-    mp.spawn(fn,
-             args=(world_size,),
-             nprocs=world_size,
-             join=True)
+def run_ddp(fn, world_size, opt):
+    mp.spawn(fn, args=(world_size, opt), nprocs=world_size, join=True)
     
 if __name__ == "__main__":
-    n_gpus = torch.cuda.device_count()
-    assert n_gpus >= 2, f"Requires at least 2 GPUs to run, but got {n_gpus}"
-    print(n_gpus)
-    world_size = n_gpus
-    run(basic, world_size)
-    
+    opt = Options("train").get_args()
+    if opt.ddp_mode:
+        n_gpus = torch.cuda.device_count()
+        assert n_gpus >= 2, f"Requires at least 2 GPUs to run, but got {n_gpus}"
+        run_ddp(ddp_function, n_gpus, opt)
+    else:
+        train(opt)
